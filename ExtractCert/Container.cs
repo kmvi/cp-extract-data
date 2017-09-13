@@ -107,9 +107,14 @@ namespace ExtractCert
             var seq1 = header as Asn1Sequence;
             if (seq1 != null && seq1.Count > 0) {
                 var seq2 = seq1[0] as Asn1Sequence;
-                if (seq2 != null && (seq2.Count == 5 || seq2.Count == 6)) {
-                    var key = Asn1Utils.ExtractOctets(seq2[seq2.Count - 1]);
-                    if (key.Length == 8) {
+                if (seq2 != null) {
+                    byte[] key = null;
+                    if (seq2.Count == 5 || seq2.Count == 6) {
+                        key = Asn1Utils.ExtractOctets(seq2[seq2.Count - 1]);
+                    } else if (seq2.Count == 7) {
+                        key = Asn1Utils.ExtractOctets(seq2[5]);
+                    }
+                    if (key != null && key.Length == 8) {
                         return key;
                     }
                 }
