@@ -72,7 +72,7 @@ namespace ExtractPkey
 
         static void PrintHelp()
         {
-            Console.WriteLine("Использование: extractcert {ПАРАМЕТРЫ}");
+            Console.WriteLine("Использование: extractpkey {ПАРАМЕТРЫ}");
             Console.WriteLine("Извлечение данных из контейнера Крипто ПРО");
             Console.WriteLine();
             Console.WriteLine("Параметры:");
