@@ -129,7 +129,7 @@ namespace ExtractCert
             var seq1 = header as Asn1Sequence;
             if (seq1 != null && seq1.Count > 0) {
                 var seq2 = seq1[0] as Asn1Sequence;
-                if (seq2 != null && seq2.Count == 6) {
+                if (seq2 != null && seq2.Count >= 6) {
                     return Asn1Utils.ExtractOctets(seq2[4]);
                 }
             }
