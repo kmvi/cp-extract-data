@@ -5,7 +5,7 @@ using System.Linq;
 using System.Security.Principal;
 using System.Text;
 
-namespace ExtractCert
+namespace ExtractPkey
 {
     class RegistryContainer : Container
     {

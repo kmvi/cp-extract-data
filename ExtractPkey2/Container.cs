@@ -10,7 +10,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace ExtractCert
+namespace ExtractPkey
 {
     abstract class Container
     {

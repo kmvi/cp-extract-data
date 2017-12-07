@@ -7,8 +7,8 @@
     <ProjectGuid>{07FA5D21-55D2-4016-81D9-F8E566EF76C1}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ExtractCert</RootNamespace>
-    <AssemblyName>ExtractCert</AssemblyName>
+    <RootNamespace>ExtractPkey</RootNamespace>
+    <AssemblyName>ExtractPkey</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>

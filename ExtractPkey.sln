@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtractCert", "ExtractCert\ExtractCert.csproj", "{07FA5D21-55D2-4016-81D9-F8E566EF76C1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtractPkey2", "ExtractPkey2\ExtractPkey2.csproj", "{07FA5D21-55D2-4016-81D9-F8E566EF76C1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
