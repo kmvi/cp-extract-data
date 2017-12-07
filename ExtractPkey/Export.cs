@@ -73,13 +73,18 @@ namespace ExtractPkey
                 if (!result)
                     throw new Win32Exception(Marshal.GetLastWin32Error());
 
+                CheckProvider(provInfo);
                 CheckPermission(userKey);
 
                 result = NativeMethods.CryptGenKey(provOrKey, NativeMethods.ALG_ID.CALG_DH_EL_EPHEM, 0, out phSessionKey);
                 if (!result)
                     throw new Win32Exception(Marshal.GetLastWin32Error());
 
-                uint pbdatalen = 100;
+                uint pbdatalen = 0;
+                result = NativeMethods.CryptExportKey(phSessionKey, IntPtr.Zero, NativeMethods.PUBLICKEYBLOB, 0, null, ref pbdatalen);
+                if (!result)
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+
                 sessionKeyData = new byte[pbdatalen];
                 result = NativeMethods.CryptExportKey(phSessionKey, IntPtr.Zero, NativeMethods.PUBLICKEYBLOB, 0, sessionKeyData, ref pbdatalen);
                 if (!result)
@@ -93,7 +98,10 @@ namespace ExtractPkey
                     bVersion = 0x20,
                     Magic = NativeMethods.GR3410_1_MAGIC,
                     BitLen = 512,
-                    // bASN1GostR3410_94_PublicKeyParameters
+                    // 301206072a85030202240006072a850302021e01
+                    // SEQUENCE(2 elem)
+                    // OBJECT IDENTIFIER 1.2.643.2.2.36.0
+                    // OBJECT IDENTIFIER1.2.643.2.2.30.1
                     KeyData1 = 0x07061230,
                     KeyData2 = 0x0203852A,
                     KeyData3 = 0x06002402,
@@ -150,6 +158,13 @@ namespace ExtractPkey
             }
         }
 
+        private static void CheckProvider(NativeMethods.CRYPT_KEY_PROV_INFO provInfo)
+        {
+            var provider = provInfo.pwszProvName.ToUpperInvariant();
+            if (!provider.StartsWith("CRYPTO-PRO"))
+                throw new CryptographicException("CSP not supported: " + provInfo.pwszProvName);
+        }
+
         /*
         private static X509Certificate2 SelectCertificate()
         {
@@ -182,7 +197,7 @@ namespace ExtractPkey
 
             var permission = BitConverter.ToUInt32(data, 0);
             if ((permission & NativeMethods.CRYPT_EXPORT) == 0)
-                throw new Exception("Private key export disabled.");
+                throw new CryptographicException("Private key export disabled.");
         }
     }
 }
