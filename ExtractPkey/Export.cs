@@ -1,6 +1,8 @@
 ﻿using Microsoft.Win32.SafeHandles;
 using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Math;
+using Org.BouncyCastle.Security;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -101,7 +103,7 @@ namespace ExtractPkey
                     // 301206072a85030202240006072a850302021e01
                     // SEQUENCE(2 elem)
                     // OBJECT IDENTIFIER 1.2.643.2.2.36.0
-                    // OBJECT IDENTIFIER1.2.643.2.2.30.1
+                    // OBJECT IDENTIFIER 1.2.643.2.2.30.1
                     KeyData1 = 0x07061230,
                     KeyData2 = 0x0203852A,
                     KeyData3 = 0x06002402,
@@ -158,27 +160,24 @@ namespace ExtractPkey
             }
         }
 
+        public void CheckPublicKey(BigInteger privateKey)
+        {
+            var param = new ECKeyGenerationParameters(Paramset, new SecureRandom());
+            var point = param.DomainParameters.G.Multiply(privateKey).Normalize();
+            var x = point.AffineXCoord.GetEncoded().Reverse().ToArray();
+            var publicKey = _cert.GetPublicKey();
+            for (int i = 0; i < x.Length; ++i) {
+                if (x[i] != publicKey[i + 2])
+                    throw new CryptographicException("Public key check failed.");
+            }
+        }
+
         private static void CheckProvider(NativeMethods.CRYPT_KEY_PROV_INFO provInfo)
         {
             var provider = provInfo.pwszProvName.ToUpperInvariant();
             if (!provider.StartsWith("CRYPTO-PRO"))
                 throw new CryptographicException("CSP not supported: " + provInfo.pwszProvName);
         }
-
-        /*
-        private static X509Certificate2 SelectCertificate()
-        {
-            var store = new X509Store(StoreLocation.CurrentUser);
-            store.Open(OpenFlags.ReadOnly);
-            var result = X509Certificate2UI.SelectFromCollection(store.Certificates,
-                "Select certificate", "Select certificate to export",
-                X509SelectionFlag.SingleSelection);
-            store.Close();
-            return (result != null && result.Count > 0)
-                ? result[0]
-                : null;
-        }
-        */
 
         static SafeHandleZeroOrMinusOneIsInvalid GetHandle(X509Certificate2 cert)
         {

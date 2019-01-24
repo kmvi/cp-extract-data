@@ -44,6 +44,7 @@ namespace ExtractPkey
                 var cert = FindCertificate(FixThumbprint(thumbprint));
                 var export = new Export(cert);
                 var pkey = export.ExportPrivateKey();
+                export.CheckPublicKey(pkey);
                 PrintPrivateKey(pkey, export.Paramset);
             } catch (Exception e) {
                 Console.Error.WriteLine(e.Message);
