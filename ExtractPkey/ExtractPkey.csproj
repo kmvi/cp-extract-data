@@ -51,7 +51,6 @@
   <ItemGroup>
     <Compile Include="EncryptedPrivateKey.cs" />
     <Compile Include="Export.cs" />
-    <Compile Include="Gost28147MacIV.cs" />
     <Compile Include="KeyDerivation.cs" />
     <Compile Include="NativeMethods.cs" />
     <Compile Include="PkeyFormatter.cs" />

@@ -68,7 +68,7 @@ namespace ExtractPkey
         private void CheckMac(byte[] cekDecrypted, byte[] kek)
         {
             var cekmac = new byte[4];
-            var mac = new Gost28147MacIV();
+            var mac = new Gost28147Mac();
             var key = ParameterUtilities.CreateKeyParameter("GOST", kek);
             var prms = new ParametersWithIV(key, UKM);
 
