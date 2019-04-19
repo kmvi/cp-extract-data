@@ -55,6 +55,7 @@
     <Compile Include="FolderContainer.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ProviderType.cs" />
     <Compile Include="RegistryContainer.cs" />
   </ItemGroup>
   <ItemGroup>

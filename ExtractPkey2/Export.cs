@@ -22,7 +22,7 @@ namespace ExtractPkey
     {
         public void Export(Container container, Stream output)
         {
-            var privateKey = EncodePrivateKey(container.GetPrivateKey());
+            var privateKey = EncodePrivateKey(container);
             var pemObject = new PemObject("PRIVATE KEY", privateKey.GetDerEncoded());
             using (var sw = new StreamWriter(output)) {
                 var writer = new PemWriter(sw);
@@ -30,18 +30,18 @@ namespace ExtractPkey
             }
         }
 
-        private static Asn1Object EncodePrivateKey(ECPrivateKeyParameters pKey)
+        private static Asn1Object EncodePrivateKey(Container container)
         {
             return new DerSequence(
                 new DerInteger(0),
                 new DerSequence(
-                    CryptoProObjectIdentifiers.GostR3410x2001,
+                    container.SignAlgorithmId,
                     new DerSequence(
-                        pKey.PublicKeyParamSet,
-                        CryptoProObjectIdentifiers.GostR3411x94CryptoProParamSet
+                        container.PublicKeyParamSetId,
+                        container.DigestAlgorithmId
                     )
                 ),
-                new DerOctetString(new DerInteger(pKey.D))
+                new DerOctetString(new DerInteger(container.GetPrivateKey().D))
             );
         }
     }
