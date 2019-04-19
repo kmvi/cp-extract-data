@@ -217,7 +217,7 @@ namespace ExtractPkey
             IDigest digest =
                 ProviderType == ProviderType.CryptoPro_2001
                     ? new Gost3411Digest(Gost28147Engine.GetSBox("D-A")) as IDigest
-                    : new GOST3411_2012_256Digest();
+                    : new Gost3411_2012_256Digest();
 
             digest.BlockUpdate(salt, 0, salt.Length);
             if (pin.Length > 0)
