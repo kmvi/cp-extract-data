@@ -49,13 +49,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\ExtractPkey2\Asn1Utils.cs">
+      <Link>Asn1Utils.cs</Link>
+    </Compile>
     <Compile Include="EncryptedPrivateKey.cs" />
     <Compile Include="Export.cs" />
     <Compile Include="KeyDerivation.cs" />
+    <Compile Include="KeyExportFactory.cs" />
     <Compile Include="NativeMethods.cs" />
-    <Compile Include="PkeyFormatter.cs" />
+    <Compile Include="PrivateKeyBlob.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ProviderType.cs" />
     <Compile Include="SessionKey.cs" />
   </ItemGroup>
   <ItemGroup>

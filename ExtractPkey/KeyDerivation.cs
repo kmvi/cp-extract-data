@@ -1,9 +1,13 @@
-﻿using Org.BouncyCastle.Asn1.CryptoPro;
+﻿using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Asn1.CryptoPro;
+using Org.BouncyCastle.Asn1.Rosstandart;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Digests;
+using Org.BouncyCastle.Crypto.Generators;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Utilities.Encoders;
 using Org.BouncyCastle.X509;
 using System;
 using System.Collections.Generic;
@@ -12,52 +16,100 @@ using System.Text;
 
 namespace ExtractPkey
 {
-    class KeyDerivation
+    abstract class KeyDerivation
     {
-        private AsymmetricCipherKeyPair _keyPair;
+        protected AsymmetricCipherKeyPair _keyPair;
+
+        protected abstract DerObjectIdentifier PublicKeyParamSetOid { get; }
+        protected abstract DerObjectIdentifier DigestParamSetOid { get; }
+        protected abstract int PublicKeyLength { get; }
+        protected abstract IDigest GetDigest();
 
         public void Init()
         {
-            var generator = GeneratorUtilities.GetKeyPairGenerator("ECGOST3410");
-            var param = new ECKeyGenerationParameters(CryptoProObjectIdentifiers.GostR3410x2001CryptoProXchA, new SecureRandom());
+            var curve = ECGost3410NamedCurves.GetByOid(PublicKeyParamSetOid);
+            var ecp = new ECNamedDomainParameters(PublicKeyParamSetOid, curve);
+            var gostParams = new ECGost3410Parameters(ecp, PublicKeyParamSetOid, DigestParamSetOid, null);
+            var param = new ECKeyGenerationParameters(gostParams, new SecureRandom());
+            var generator = new ECKeyPairGenerator();
             generator.Init(param);
             _keyPair = generator.GenerateKeyPair();
         }
 
         public byte[] GetPublicKeyBytes()
         {
-            var result = new byte[64];
+            var result = new byte[PublicKeyLength];
             var pubInfo = SubjectPublicKeyInfoFactory.CreateSubjectPublicKeyInfo(_keyPair.Public);
-            var encoded = pubInfo.PublicKeyData.GetDerEncoded();
-            Array.Copy(encoded, 5, result, 0, 64);
+            var encoded = pubInfo.PublicKeyData.GetBytes();
+            Array.Copy(encoded, encoded.Length - PublicKeyLength, result, 0, PublicKeyLength);
             return result;
         }
 
         // https://tools.ietf.org/html/rfc4357#section-5.2
-        public byte[] Vko(EncryptedPrivateKey encPk, ECPublicKeyParameters sessionKey)
+        // https://tools.ietf.org/html/rfc7836#section-4.3
+        public byte[] Vko(EncryptedPrivateKey encPk, ECPublicKeyParameters y)
         {
-            var privKey = (ECPrivateKeyParameters)_keyPair.Private;
+            var x = (ECPrivateKeyParameters)_keyPair.Private;
 
             var ukmBytes = (byte[])encPk.UKM.Clone();
             Array.Reverse(ukmBytes);
             var ukm = new BigInteger(1, ukmBytes);
 
-            var p = ukm.Multiply(privKey.D).Mod(sessionKey.Parameters.Curve.Order);
-            var kekPoint = sessionKey.Q.Multiply(p).Normalize();
-            var x = kekPoint.XCoord.ToBigInteger().ToByteArrayUnsigned();
-            var y = kekPoint.YCoord.ToBigInteger().ToByteArrayUnsigned();
+            var p = ukm.Multiply(x.D).Mod(y.Parameters.Curve.Order);
+            var kekPoint = y.Q.Multiply(p).Normalize();
+            var kekPointX = kekPoint.AffineXCoord.ToBigInteger().ToByteArrayUnsigned();
+            var kekPointY = kekPoint.AffineYCoord.ToBigInteger().ToByteArrayUnsigned();
 
-            var kekBytes = new byte[64];
-            Array.Copy(y, 0, kekBytes, 0, 32);
-            Array.Copy(x, 0, kekBytes, 32, 32);
+            var kekBytes = new byte[kekPointX.Length + kekPointY.Length];
+            Array.Copy(kekPointY, 0, kekBytes, 0, kekPointY.Length);
+            Array.Copy(kekPointX, 0, kekBytes, kekPointY.Length, kekPointX.Length);
             Array.Reverse(kekBytes);
 
-            var kek = new byte[32];
-            var dig = new Gost3411Digest();
+            var dig = GetDigest();
+            var kek = new byte[dig.GetDigestSize()];            
             dig.BlockUpdate(kekBytes, 0, kekBytes.Length);
             dig.DoFinal(kek, 0);
 
             return kek;
         }
+    }
+
+    class KeyDerivation_2001 : KeyDerivation
+    {
+        protected override DerObjectIdentifier PublicKeyParamSetOid
+            => CryptoProObjectIdentifiers.GostR3410x2001CryptoProXchA;
+
+        protected override DerObjectIdentifier DigestParamSetOid
+            => CryptoProObjectIdentifiers.GostR3411x94CryptoProParamSet;
+
+        protected override int PublicKeyLength => 64;
+
+        protected override IDigest GetDigest() => new Gost3411Digest();
+    }
+
+    class KeyDerivation_2012_256 : KeyDerivation
+    {
+        protected override DerObjectIdentifier PublicKeyParamSetOid
+            => CryptoProObjectIdentifiers.GostR3410x2001CryptoProXchA;
+
+        protected override DerObjectIdentifier DigestParamSetOid
+            => RosstandartObjectIdentifiers.id_tc26_gost_3411_12_256;
+
+        protected override int PublicKeyLength => 64;
+
+        protected override IDigest GetDigest() => new Gost3411_2012_256Digest();
+    }
+
+    class KeyDerivation_2012_512 : KeyDerivation
+    {
+        protected override DerObjectIdentifier PublicKeyParamSetOid
+            => RosstandartObjectIdentifiers.id_tc26_gost_3410_12_512_paramSetA;
+
+        protected override DerObjectIdentifier DigestParamSetOid
+            => RosstandartObjectIdentifiers.id_tc26_gost_3411_12_512;
+
+        protected override int PublicKeyLength => 128;
+
+        protected override IDigest GetDigest() => new Gost3411_2012_256Digest();
     }
 }

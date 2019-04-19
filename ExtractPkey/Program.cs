@@ -5,9 +5,7 @@ using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Utilities.IO.Pem;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -45,7 +43,8 @@ namespace ExtractPkey
                 var export = new Export(cert);
                 var pkey = export.ExportPrivateKey();
                 export.CheckPublicKey(pkey);
-                PrintPrivateKey(pkey, export.Paramset);
+                PrintPrivateKey(pkey, export.ParamSetId,
+                    export.DHAlgorithmId, export.DigestAlgorithmId);
             } catch (Exception e) {
                 Console.Error.WriteLine(e.Message);
             }
@@ -60,16 +59,17 @@ namespace ExtractPkey
             options.WriteOptionDescriptions(Console.Out);
         }
 
-        private static void PrintPrivateKey(BigInteger pkey, DerObjectIdentifier algId)
+        private static void PrintPrivateKey(BigInteger pkey,
+            DerObjectIdentifier algId, DerObjectIdentifier dhAlgId, DerObjectIdentifier digestAlgId)
         {
             var ecpkey = new ECPrivateKeyParameters("ECGOST3410", pkey, algId);
             var pkeyEnc = new DerSequence(
                 new DerInteger(0),
                 new DerSequence(
-                    CryptoProObjectIdentifiers.GostR3410x2001,
+                    dhAlgId,
                     new DerSequence(
                         ecpkey.PublicKeyParamSet,
-                        CryptoProObjectIdentifiers.GostR3411x94CryptoProParamSet
+                        digestAlgId
                     )
                 ),
                 new DerOctetString(new DerInteger(ecpkey.D))

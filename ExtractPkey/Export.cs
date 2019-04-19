@@ -3,6 +3,7 @@ using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Utilities.Encoders;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -26,18 +27,34 @@ namespace ExtractPkey
             _cert = certificate;
         }
 
+        private static CspParameters GetPrivateKeyInfo(X509Certificate2 cert)
+        {
+            var handle = typeof(X509Certificate2).GetField("m_safeCertContext",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var method = typeof(X509Certificate2).GetMethod("GetPrivateKeyInfo",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            var result = new CspParameters();
+            method.Invoke(null, new object[] { handle.GetValue(cert), result });
+            return result;
+        }
+
         public BigInteger ExportPrivateKey()
         {
-            var context = GetHandle(_cert);
+            var pkeyInfo = GetPrivateKeyInfo(_cert);
+            CheckProvider(pkeyInfo);
+            var provType = (ProviderType)pkeyInfo.ProviderType;
+            var factory = KeyExportFactory.Create(provType);
 
-            var derive = new KeyDerivation();
+            GetPrivateKeyInfo(_cert);
+
+            var derive = factory.CreateKeyDerivation();
             derive.Init();
-            
-            byte[] sessKey, privKeyBlob;
-            ExportPrivateKey(context, derive.GetPublicKeyBytes(), out sessKey, out privKeyBlob);
 
-            _encryptedPkey = new EncryptedPrivateKey(privKeyBlob);
-            _sk = new SessionKey(sessKey);
+            var blob = factory.CreatePrivateKeyBlob();
+            var privKeyBlob = blob.GetPrivateKeyBlob(_cert.Handle, derive.GetPublicKeyBytes());
+            
+            _encryptedPkey = factory.CreateEncryptedPrivateKey(privKeyBlob);
+            _sk = factory.CreateSessionKey(blob.SessionKey);
             var kek = derive.Vko(_encryptedPkey, _sk.GetPublicKey());
             var pkey = _encryptedPkey.UnwrapKey(kek);
             Array.Reverse(pkey);
@@ -45,158 +62,27 @@ namespace ExtractPkey
             return new BigInteger(1, pkey);
         }
 
-        public DerObjectIdentifier Paramset { get { return _encryptedPkey.Paramset; } }
-
-        private static void ExportPrivateKey(SafeHandle context, byte[] genkey, out byte[] sessionKeyData, out byte[] privKeyData)
-        {
-            bool result, shouldFree = false;
-            NativeMethods.KeySpec addInfo = 0;
-
-            IntPtr provOrKey = IntPtr.Zero, hExportKey = IntPtr.Zero,
-                phSessionKey = IntPtr.Zero, provInfoPtr = IntPtr.Zero, userKey = IntPtr.Zero;            
-
-            try {
-                result = NativeMethods.CryptAcquireCertificatePrivateKey(context, 0, IntPtr.Zero, ref provOrKey, ref addInfo, ref shouldFree);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                uint pcbData = 0;
-                result = NativeMethods.CertGetCertificateContextProperty(context, NativeMethods.CERT_KEY_PROV_INFO_PROP_ID, provInfoPtr, ref pcbData);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                provInfoPtr = Marshal.AllocHGlobal((int)pcbData);
-                result = NativeMethods.CertGetCertificateContextProperty(context, NativeMethods.CERT_KEY_PROV_INFO_PROP_ID, provInfoPtr, ref pcbData);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                var provInfo = (NativeMethods.CRYPT_KEY_PROV_INFO)Marshal.PtrToStructure(provInfoPtr, typeof(NativeMethods.CRYPT_KEY_PROV_INFO));
-                result = NativeMethods.CryptGetUserKey(provOrKey, (uint)addInfo, ref userKey);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                CheckProvider(provInfo);
-                CheckPermission(userKey);
-
-                result = NativeMethods.CryptGenKey(provOrKey, NativeMethods.ALG_ID.CALG_DH_EL_EPHEM, 0, out phSessionKey);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                uint pbdatalen = 0;
-                result = NativeMethods.CryptExportKey(phSessionKey, IntPtr.Zero, NativeMethods.PUBLICKEYBLOB, 0, null, ref pbdatalen);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                sessionKeyData = new byte[pbdatalen];
-                result = NativeMethods.CryptExportKey(phSessionKey, IntPtr.Zero, NativeMethods.PUBLICKEYBLOB, 0, sessionKeyData, ref pbdatalen);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                var blob = new CRYPT_PUBLICKEYBLOB
-                {
-                    reserved = 0,
-                    bType = 6,
-                    aiKeyAlg = (uint)NativeMethods.ALG_ID.CALG_GR3410EL,
-                    bVersion = 0x20,
-                    Magic = NativeMethods.GR3410_1_MAGIC,
-                    BitLen = 512,
-                    // 301206072a85030202240006072a850302021e01
-                    // SEQUENCE(2 elem)
-                    // OBJECT IDENTIFIER 1.2.643.2.2.36.0
-                    // OBJECT IDENTIFIER 1.2.643.2.2.30.1
-                    KeyData1 = 0x07061230,
-                    KeyData2 = 0x0203852A,
-                    KeyData3 = 0x06002402,
-                    KeyData4 = 0x03852A07,
-                    KeyData5 = 0x011E0202
-                };
-
-                var blobData = blob.GetBytes();
-                var pbdata2 = new byte[100];
-                for (int i = 0; i < blobData.Length; ++i) {
-                    pbdata2[i] = blobData[i];
-                }
-
-                for (int i = 0, j = 36; i < genkey.Length; ++i, ++j) {
-                    pbdata2[j] = genkey[i];
-                }
-                
-                result = NativeMethods.CryptImportKey(provOrKey, pbdata2, pbdatalen, phSessionKey, 0, ref hExportKey);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                // export wrapped key
-                var alg = BitConverter.GetBytes((uint)NativeMethods.ALG_ID.CALG_PRO_EXPORT);
-                result = NativeMethods.CryptSetKeyParam(hExportKey, (int)NativeMethods.KP_ALGID, alg, 0);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                uint pkSize = 0;
-                result = NativeMethods.CryptExportKey(userKey, hExportKey, NativeMethods.PRIVATEKEYBLOB, 0, null, ref pkSize);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-
-                privKeyData = new byte[pkSize];
-                result = NativeMethods.CryptExportKey(userKey, hExportKey, NativeMethods.PRIVATEKEYBLOB, 0, privKeyData, ref pkSize);
-                if (!result)
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-            } catch (Win32Exception e) {
-                throw new CryptographicException(e.Message, e);
-            } finally {
-                if (shouldFree)
-                    NativeMethods.CryptReleaseContext(provOrKey, 0);
-
-                if (provInfoPtr != IntPtr.Zero)
-                    Marshal.FreeHGlobal(provInfoPtr);
-                
-                if (hExportKey != IntPtr.Zero)
-                    NativeMethods.CryptDestroyKey(hExportKey);
-                
-                if (phSessionKey != IntPtr.Zero)
-                    NativeMethods.CryptDestroyKey(phSessionKey);
-                
-                if (userKey != IntPtr.Zero)
-                    NativeMethods.CryptDestroyKey(userKey);
-            }
-        }
+        public DerObjectIdentifier ParamSetId => _encryptedPkey.ParamSetId;
+        public DerObjectIdentifier DHAlgorithmId => _encryptedPkey.DHAlgorithmId;
+        public DerObjectIdentifier DigestAlgorithmId => _encryptedPkey.DigestAlgorithmId;
 
         public void CheckPublicKey(BigInteger privateKey)
         {
-            var param = new ECKeyGenerationParameters(Paramset, new SecureRandom());
+            var param = new ECKeyGenerationParameters(ParamSetId, new SecureRandom());
             var point = param.DomainParameters.G.Multiply(privateKey).Normalize();
             var x = point.AffineXCoord.GetEncoded().Reverse().ToArray();
             var publicKey = _cert.GetPublicKey();
             for (int i = 0; i < x.Length; ++i) {
-                if (x[i] != publicKey[i + 2])
+                if (x[i] != publicKey[i + publicKey.Length - x.Length * 2])
                     throw new CryptographicException("Public key check failed.");
             }
         }
 
-        private static void CheckProvider(NativeMethods.CRYPT_KEY_PROV_INFO provInfo)
-        {
-            var provider = provInfo.pwszProvName.ToUpperInvariant();
-            if (!provider.StartsWith("CRYPTO-PRO"))
-                throw new CryptographicException("CSP not supported: " + provInfo.pwszProvName);
-        }
-
-        static SafeHandleZeroOrMinusOneIsInvalid GetHandle(X509Certificate2 cert)
-        {
-            var contextField = typeof(X509Certificate2).GetField("m_safeCertContext", BindingFlags.Instance | BindingFlags.NonPublic);
-            return (SafeHandleZeroOrMinusOneIsInvalid)contextField.GetValue(cert);
-        }
-
-        private static void CheckPermission(IntPtr userKey)
-        {
-            uint datalen = 4;
-            var data = new byte[4];
-
-            var result = NativeMethods.CryptGetKeyParam(userKey, NativeMethods.KP_PERMISSIONS, data, ref datalen, 0);
-            if (!result)
-                throw new Win32Exception(Marshal.GetLastWin32Error());
-
-            var permission = BitConverter.ToUInt32(data, 0);
-            if ((permission & NativeMethods.CRYPT_EXPORT) == 0)
-                throw new CryptographicException("Private key export disabled.");
+        private static void CheckProvider(CspParameters cspParams)
+        { 
+            if (cspParams.ProviderType != 75 && cspParams.ProviderType != 80 && cspParams.ProviderType != 81) {
+                throw new CryptographicException($"CSP not supported: {cspParams.ProviderName}");
+            }
         }
     }
 }
