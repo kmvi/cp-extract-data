@@ -16,5 +16,5 @@
 
 Примеры:
 
-- `extractpkey -f g:\hcskberm.000 -p 12345678 > pkey.pem`
-- `extractpkey -r le-dfa0f60b-4b16-49af-a5fe-af7acf4e6fed -p 12345678 > pkey.pem`
+- `extractpkey -f g:\hcskberm.000 -p 12345678 > pkey.pem` - указывается путь до контейнера и пин-код (если имеется).
+- `extractpkey -r le-dfa0f60b-4b16-49af-a5fe-af7acf4e6fed -p 12345678 > pkey.pem`- указывается имя контейнера в реестре и пин-код (если имеется).
