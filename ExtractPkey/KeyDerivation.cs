@@ -20,16 +20,14 @@ namespace ExtractPkey
     {
         protected AsymmetricCipherKeyPair _keyPair;
 
-        protected abstract DerObjectIdentifier PublicKeyParamSetOid { get; }
-        protected abstract DerObjectIdentifier DigestParamSetOid { get; }
         protected abstract int PublicKeyLength { get; }
         protected abstract IDigest GetDigest();
 
-        public void Init()
+        public void Init(DerObjectIdentifier publicKeyParamSetOid, DerObjectIdentifier digestParamSetOid)
         {
-            var curve = ECGost3410NamedCurves.GetByOid(PublicKeyParamSetOid);
-            var ecp = new ECNamedDomainParameters(PublicKeyParamSetOid, curve);
-            var gostParams = new ECGost3410Parameters(ecp, PublicKeyParamSetOid, DigestParamSetOid, null);
+            var curve = ECGost3410NamedCurves.GetByOid(publicKeyParamSetOid);
+            var ecp = new ECNamedDomainParameters(publicKeyParamSetOid, curve);
+            var gostParams = new ECGost3410Parameters(ecp, publicKeyParamSetOid, digestParamSetOid, null);
             var param = new ECKeyGenerationParameters(gostParams, new SecureRandom());
             var generator = new ECKeyPairGenerator();
             generator.Init(param);
@@ -76,40 +74,19 @@ namespace ExtractPkey
 
     class KeyDerivation_2001 : KeyDerivation
     {
-        protected override DerObjectIdentifier PublicKeyParamSetOid
-            => CryptoProObjectIdentifiers.GostR3410x2001CryptoProXchA;
-
-        protected override DerObjectIdentifier DigestParamSetOid
-            => CryptoProObjectIdentifiers.GostR3411x94CryptoProParamSet;
-
         protected override int PublicKeyLength => 64;
-
         protected override IDigest GetDigest() => new Gost3411Digest();
     }
 
     class KeyDerivation_2012_256 : KeyDerivation
     {
-        protected override DerObjectIdentifier PublicKeyParamSetOid
-            => CryptoProObjectIdentifiers.GostR3410x2001CryptoProXchA;
-
-        protected override DerObjectIdentifier DigestParamSetOid
-            => RosstandartObjectIdentifiers.id_tc26_gost_3411_12_256;
-
         protected override int PublicKeyLength => 64;
-
         protected override IDigest GetDigest() => new Gost3411_2012_256Digest();
     }
 
     class KeyDerivation_2012_512 : KeyDerivation
     {
-        protected override DerObjectIdentifier PublicKeyParamSetOid
-            => RosstandartObjectIdentifiers.id_tc26_gost_3410_12_512_paramSetA;
-
-        protected override DerObjectIdentifier DigestParamSetOid
-            => RosstandartObjectIdentifiers.id_tc26_gost_3411_12_512;
-
         protected override int PublicKeyLength => 128;
-
         protected override IDigest GetDigest() => new Gost3411_2012_256Digest();
     }
 }

@@ -45,13 +45,9 @@ namespace ExtractPkey
             var provType = (ProviderType)pkeyInfo.ProviderType;
             var factory = KeyExportFactory.Create(provType);
 
-            GetPrivateKeyInfo(_cert);
-
             var derive = factory.CreateKeyDerivation();
-            derive.Init();
-
             var blob = factory.CreatePrivateKeyBlob();
-            var privKeyBlob = blob.GetPrivateKeyBlob(_cert.Handle, derive.GetPublicKeyBytes());
+            var privKeyBlob = blob.GetPrivateKeyBlob(_cert.Handle, derive);
             
             _encryptedPkey = factory.CreateEncryptedPrivateKey(privKeyBlob);
             _sk = factory.CreateSessionKey(blob.SessionKey);
@@ -80,7 +76,10 @@ namespace ExtractPkey
 
         private static void CheckProvider(CspParameters cspParams)
         { 
-            if (cspParams.ProviderType != 75 && cspParams.ProviderType != 80 && cspParams.ProviderType != 81) {
+            if (cspParams.ProviderType != (int)ProviderType.CryptoPro_2001 &&
+                cspParams.ProviderType != (int)ProviderType.CryptoPro_2012_512 &&
+                cspParams.ProviderType != (int)ProviderType.CryptoPro_2012_1024)
+            {
                 throw new CryptographicException($"CSP not supported: {cspParams.ProviderName}");
             }
         }

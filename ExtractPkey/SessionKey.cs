@@ -90,6 +90,6 @@ namespace ExtractPkey
         protected override Gost3410PublicKeyAlgParameters PublicKeyAlgParameters
             => new Gost3410PublicKeyAlgParameters(
                 RosstandartObjectIdentifiers.id_tc26_gost_3410_12_512_paramSetA,
-                RosstandartObjectIdentifiers.id_tc26_gost_3411_12_256);
+                RosstandartObjectIdentifiers.id_tc26_gost_3411_12_512);
     }
 }

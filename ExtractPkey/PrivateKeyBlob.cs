@@ -21,7 +21,7 @@ namespace ExtractPkey
         protected abstract int KeyOffset { get; }
         protected abstract uint BlobLength { get; }
 
-        public byte[] GetPrivateKeyBlob(IntPtr context, byte[] genkey)
+        public byte[] GetPrivateKeyBlob(IntPtr context, KeyDerivation derive)
         {
             bool result, shouldFree = false;
             NativeMethods.KeySpec addInfo = 0;
@@ -79,9 +79,9 @@ namespace ExtractPkey
                     BitLen = PublicKeyLength
                 };
 
-                var seq = new DerSequence(
-                        new DerObjectIdentifier(dhOIDstr),
-                        new DerObjectIdentifier(hashOIDstr));
+                var dhOid = new DerObjectIdentifier(dhOIDstr);
+                var hashOid = new DerObjectIdentifier(hashOIDstr);
+                var seq = new DerSequence(dhOid, hashOid);
 
                 var keyData = seq.GetDerEncoded();
                 Array.Resize(ref keyData, 24);
@@ -95,6 +95,9 @@ namespace ExtractPkey
                 for (int i = 0; i < KeyOffset; ++i) {
                     pbdata2[i] = blobData[i];
                 }
+
+                derive.Init(dhOid, hashOid);
+                var genkey = derive.GetPublicKeyBytes();
 
                 for (int i = 0, j = KeyOffset; i < genkey.Length; ++i, ++j) {
                     pbdata2[j] = genkey[i];
