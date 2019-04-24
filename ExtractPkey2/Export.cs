@@ -37,8 +37,8 @@ namespace ExtractPkey
                 new DerSequence(
                     container.SignAlgorithmId,
                     new DerSequence(
-                        container.PublicKeyParamSetId,
-                        container.DigestAlgorithmId
+                        container.PublicKeyAlg.PublicKeyParamSet,
+                        container.PublicKeyAlg.DigestParamSet
                     )
                 ),
                 new DerOctetString(new DerInteger(container.GetPrivateKey().D))

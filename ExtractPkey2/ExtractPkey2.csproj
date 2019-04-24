@@ -56,6 +56,10 @@
     <Compile Include="Container.cs" />
     <Compile Include="Export.cs" />
     <Compile Include="FolderContainer.cs" />
+    <Compile Include="HeaderStructure.cs" />
+    <Compile Include="MasksStructure.cs" />
+    <Compile Include="PrimaryStructure.cs" />
+    <Compile Include="PrivateKeyParameters.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RegistryContainer.cs" />

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 
@@ -21,6 +22,9 @@ namespace ExtractPkey
         {
             var keyName = GetCurrentUserKeyName(_containerName);
             using (var key = Registry.LocalMachine.OpenSubKey(keyName)) {
+                if (key == null)
+                    throw new CryptographicException($"Ключ \"HKLM\\{keyName}\" не найден.");
+
                 return new Container.Data
                 {
                     Header = (byte[])key.GetValue("header.key"),

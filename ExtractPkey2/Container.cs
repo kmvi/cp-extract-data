@@ -15,7 +15,9 @@ namespace ExtractPkey
 {
     abstract class Container
     {
-        private readonly Lazy<Asn1Object> _headerObj;
+        private readonly Lazy<HeaderStructure> _headerObj;
+        private readonly Lazy<PrimaryStructure> _primaryObj;
+        private readonly Lazy<MasksStructure> _masksObj;
         private readonly Lazy<Data> _data;
         protected readonly string _pin;
 
@@ -23,92 +25,51 @@ namespace ExtractPkey
         {
             _pin = pin;
             _data = new Lazy<Data>(LoadContainerData);
-            _headerObj = new Lazy<Asn1Object>(() => Asn1Object.FromByteArray(Header));
+            _headerObj = new Lazy<HeaderStructure>(LoadHeader);
+            _primaryObj = new Lazy<PrimaryStructure>(LoadPrimary);
+            _masksObj = new Lazy<MasksStructure>(LoadMasks);
         }
 
-        private Asn1Object HeaderObject => _headerObj.Value;
+        private MasksStructure LoadMasks()
+            => MasksStructure.GetInstance(Asn1Object.FromByteArray(_data.Value.Masks));
 
-        public byte[] Header => _data.Value.Header;
-        public byte[] Masks => _data.Value.Masks;
-        public byte[] Masks2 => _data.Value.Masks2;
-        public byte[] Name => _data.Value.Name;
-        public byte[] Primary => _data.Value.Primary;
-        public byte[] Primary2 => _data.Value.Primary2;
+        private PrimaryStructure LoadPrimary()
+            => PrimaryStructure.GetInstance(Asn1Object.FromByteArray(_data.Value.Primary));
 
-        public DerObjectIdentifier PublicKeyParamSetId => GetOID(HeaderObject, "0/2/1/1/0");
-        public DerObjectIdentifier DigestAlgorithmId => GetOID(HeaderObject, "0/2/1/1/1");
-        public DerObjectIdentifier DHAlgorithmId => GetOID(HeaderObject, "0/2/1/0");
-        public ProviderType ProviderType => Asn1Utils.GetProviderType(DHAlgorithmId);
-        public DerObjectIdentifier SignAlgorithmId => Asn1Utils.GetSignAlgorithmId(ProviderType);
+        private HeaderStructure LoadHeader()
+            => HeaderStructure.GetInstance(Asn1Object.FromByteArray(_data.Value.Header));
+
+        public HeaderStructure Header => _headerObj.Value;
+        public PrimaryStructure Primary => _primaryObj.Value;
+        public MasksStructure Masks => _masksObj.Value;
+
+        public Gost3410PublicKeyAlgParameters PublicKeyAlg
+            => Gost3410PublicKeyAlgParameters.GetInstance(Header.PrivateKeyParameters.Algorithm.Parameters);
+
+        public DerObjectIdentifier DHAlgorithmId
+            => Header.PrivateKeyParameters.Algorithm.Algorithm;
+
+        public ProviderType ProviderType
+            => Asn1Utils.GetProviderType(DHAlgorithmId);
+
+        public DerObjectIdentifier SignAlgorithmId
+            => Asn1Utils.GetSignAlgorithmId(ProviderType);
+
 
         public ECPrivateKeyParameters GetPrivateKey()
         {
-            var salt = GetSalt();
             var pinArray = Encoding.ASCII.GetBytes(_pin ?? "");
+            var decodeKey = GetDecodeKey(Masks.Salt, pinArray);
+            var primKeyWithMask = DecodePrimaryKey(decodeKey, Primary.Key);
 
-            var decodeKey = GetDecodeKey(salt, pinArray);
-            var encodedPrimaryKey = GetPrimaryKey();
-            var primKeyWithMask = DecodePrimaryKey(decodeKey, encodedPrimaryKey);
-
-            var masksKey = new BigInteger(1, GetMasksKey());
-
-            var param = new ECKeyGenerationParameters(PublicKeyParamSetId, new SecureRandom());
+            var masksKey = new BigInteger(1, Masks.Key);
+            var param = new ECKeyGenerationParameters(PublicKeyAlg.PublicKeyParamSet, new SecureRandom());
             var maskInv = masksKey.ModInverse(param.DomainParameters.Curve.Order);
             var rawSecret = primKeyWithMask.Multiply(maskInv).Mod(param.DomainParameters.Curve.Order);
 
-            CheckPublicKey(param.DomainParameters, rawSecret, GetPublicX(HeaderObject));
+            CheckPublicKey(param.DomainParameters, rawSecret, Header.PublicX);
 
-            return new ECPrivateKeyParameters("ECGOST3410", rawSecret, PublicKeyParamSetId);
-        }
-
-        private byte[] GetSalt()
-        {
-            var masks = Asn1Object.FromByteArray(Masks);
-
-            if (masks is Asn1Sequence masksSeq &&
-                masksSeq.Count > 1 &&
-                masksSeq[1] is Asn1OctetString saltStr)
-            {
-                var salt = saltStr.GetOctets();
-                if (salt.Length == 12)
-                    return salt;
-            }
-
-            throw new CryptographicException("Ошибка в данных masks.key.");
-        }
-
-        private byte[] GetPrimaryKey()
-        {
-            var primary = Asn1Object.FromByteArray(Primary);
-
-            if (primary is Asn1Sequence primarySeq &&
-                primarySeq.Count > 0 &&
-                primarySeq[0] is Asn1OctetString keyStr)
-            {
-                var key = keyStr.GetOctets();
-                if (key.Length == 32 || key.Length == 64)
-                    return key;
-            }
-
-            throw new CryptographicException("Ошибка в данных primary.key.");
-        }
-
-        private byte[] GetMasksKey()
-        {
-            var masks = Asn1Object.FromByteArray(Masks);
-
-            if (masks is Asn1Sequence masksSeq &&
-                masksSeq.Count > 0 &&
-                masksSeq[0] is Asn1OctetString keyStr)
-            {
-                var key = keyStr.GetOctets();
-                if (key.Length == 32 || key.Length == 64) {
-                    Array.Reverse(key);
-                    return key;
-                }
-            }
-
-            throw new CryptographicException("Ошибка в данных masks.key.");
+            return new ECPrivateKeyParameters("ECGOST3410", rawSecret, param.PublicKeyParamSet);
         }
 
         private static void CheckPublicKey(ECDomainParameters domainParams, BigInteger privateKey, byte[] publicX)
@@ -120,50 +81,13 @@ namespace ExtractPkey
                 throw new CryptographicException("Не удалось проверить корректность открытого ключа (некорректный ПИН-код?).");
         }
 
-        private static DerObjectIdentifier GetOID(Asn1Object header, string path)
-        {
-            DerObjectIdentifier algId;
-            try {
-                algId = Asn1Utils.Goto(header, path) as DerObjectIdentifier;
-            } catch (Asn1Exception e) {
-                throw new CryptographicException("Ошибка в данных header.key.", e);
-            }
-
-            if (algId != null) {
-                return algId;
-            }
-
-            throw new CryptographicException("Ошибка в данных header.key.");
-        }
-
-        private static byte[] GetPublicX(Asn1Object header)
-        {
-            if (header is Asn1Sequence seq1 &&
-                seq1.Count > 0 &&
-                seq1[0] is Asn1Sequence seq2)
-            {
-                byte[] key = null;
-                if (seq2.Count == 5 || seq2.Count == 6) {
-                    key = Asn1Utils.ExtractOctets(seq2[seq2.Count - 1]);
-                } else if (seq2.Count == 7) {
-                    key = Asn1Utils.ExtractOctets(seq2[5]);
-                }
-                if (key != null && key.Length == 8) {
-                    return key;
-                }
-            }
-
-            throw new CryptographicException("Ошибка в данных header.key.");
-        }
-
         public byte[] GetRawCertificate()
         {
-            var header = Asn1Object.FromByteArray(Header);
-            if (header is Asn1Sequence seq1 && seq1.Count > 0) {
-                if (seq1[0] is Asn1Sequence seq2 && seq2.Count >= 6) {
-                    return Asn1Utils.ExtractOctets(seq2[4]);
-                }
-            }
+            if (Header.Certificate != null)
+                return Header.Certificate.GetEncoded();
+
+            if (Header.Certificate2 != null)
+                return Header.Certificate2.GetEncoded();
 
             throw new CryptographicException("Контейнер не содержит сертификата.");
         }
@@ -232,7 +156,7 @@ namespace ExtractPkey
             var current = new byte[len];
 
             Array.Copy(Encoding.ASCII.GetBytes("DENEFH028.760246785.IUEFHWUIO.EF"), current, 32);
-            
+
             len = pin.Length > 0 ? 2000 : 2;
             for (int i = 0; i < len; ++i) {
                 XorMaterial(material36, material5c, current);
