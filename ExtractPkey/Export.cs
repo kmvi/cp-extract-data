@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32.SafeHandles;
 using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Asn1.CryptoPro;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
@@ -58,19 +59,18 @@ namespace ExtractPkey
             return new BigInteger(1, pkey);
         }
 
-        public DerObjectIdentifier ParamSetId => _encryptedPkey.ParamSetId;
-        public DerObjectIdentifier DHAlgorithmId => _encryptedPkey.DHAlgorithmId;
-        public DerObjectIdentifier DigestAlgorithmId => _encryptedPkey.DigestAlgorithmId;
+        public KeyParameters KeyParameters => _encryptedPkey.KeyParameters;
 
         public void CheckPublicKey(BigInteger privateKey)
         {
-            var param = new ECKeyGenerationParameters(ParamSetId, new SecureRandom());
+            var gostParams = Gost3410PublicKeyAlgParameters.GetInstance(KeyParameters.Algorithm.Parameters);
+            var param = new ECKeyGenerationParameters(gostParams.PublicKeyParamSet, new SecureRandom());
             var point = param.DomainParameters.G.Multiply(privateKey).Normalize();
             var x = point.AffineXCoord.GetEncoded().Reverse().ToArray();
             var publicKey = _cert.GetPublicKey();
             for (int i = 0; i < x.Length; ++i) {
                 if (x[i] != publicKey[i + publicKey.Length - x.Length * 2])
-                    throw new CryptographicException("Public key check failed.");
+                    throw new CryptographicException("Закрытый ключ не соответствует открытому ключу.");
             }
         }
 
@@ -80,7 +80,7 @@ namespace ExtractPkey
                 cspParams.ProviderType != (int)ProviderType.CryptoPro_2012_512 &&
                 cspParams.ProviderType != (int)ProviderType.CryptoPro_2012_1024)
             {
-                throw new CryptographicException($"CSP not supported: {cspParams.ProviderName}");
+                throw new CryptographicException($"Криптопровайдер не поддерживается: {cspParams.ProviderName}.");
             }
         }
     }

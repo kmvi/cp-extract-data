@@ -17,114 +17,39 @@ namespace ExtractPkey
 {
     abstract class EncryptedPrivateKey
     {
-        private readonly Asn1Object obj;
-
-        private readonly Lazy<byte[]> _ukm;
-        private readonly Lazy<byte[]> _cek;
-        private readonly Lazy<byte[]> _mac;
-
-        private readonly Lazy<DerObjectIdentifier> _dhAlgId;
-        private readonly Lazy<DerObjectIdentifier> _paramSetId;
-        private readonly Lazy<DerObjectIdentifier> _digestAlgId;
-
         public EncryptedPrivateKey(byte[] data)
         {
             if (data == null)
                 throw new ArgumentNullException("data");
             
-            if (data.Length < 72)
-                throw new ArgumentException("Invalid key length.", "data");
+            var obj = Asn1Object.FromByteArray(data.Skip(16).ToArray());
 
-            obj = Asn1Object.FromByteArray(data.Skip(16).ToArray());
+            if (obj is Asn1Sequence seq && seq.Count > 0)
+            {
+                if (seq[0] is Asn1Sequence seq2 && seq2.Count >= 2) {
+                    UKM = (seq2[0] as Asn1OctetString)?.GetOctets();
+                    if (seq2[1] is Asn1Sequence seq3 && seq3.Count >= 2) {
+                        CEK = (seq3[0] as Asn1OctetString)?.GetOctets();
+                        MAC = (seq3[1] as Asn1OctetString)?.GetOctets();
+                    }
 
-            _ukm = new Lazy<byte[]>(ExtractUkm);
-            _cek = new Lazy<byte[]>(ExtractCek);
-            _mac = new Lazy<byte[]>(ExtractMac);
+                    foreach (var tag in seq2.OfType<Asn1TaggedObject>()) {
+                        if (tag.TagNo == 0)
+                            KeyParameters = KeyParameters.GetInstance(tag.GetObject());
+                    }
+                }
+            }
 
-            _dhAlgId = new Lazy<DerObjectIdentifier>(ExtractDHAlgorithmId);
-            _paramSetId = new Lazy<DerObjectIdentifier>(ExtractParamSetId);
-            _digestAlgId = new Lazy<DerObjectIdentifier>(ExtractDigestAlgorithmId);
+            if (UKM == null || CEK == null || MAC == null || KeyParameters == null)
+                throw new CryptographicException("Ошибка в данных PRIVATEKEYBLOB.");
         }
-
-        private DerObjectIdentifier ExtractDigestAlgorithmId()
-        {
-            var id = Asn1Utils.Goto(obj, "0/2/1/1/1") as DerObjectIdentifier;
-            if (id == null)
-                throw new CryptographicException("Unable to extract digest algorithm identifier from private key data.");
-
-            return id;
-        }
-
-        private DerObjectIdentifier ExtractParamSetId()
-        {
-            var id = Asn1Utils.Goto(obj, "0/2/1/1/0") as DerObjectIdentifier;
-            if (id == null)
-                throw new CryptographicException("Unable to extract paramset identifier from private key data.");
-
-            return id;
-        }
-
-        private DerObjectIdentifier ExtractDHAlgorithmId()
-        {
-            var id = Asn1Utils.Goto(obj, "0/2/1/0") as DerObjectIdentifier;
-            if (id == null)
-                throw new CryptographicException("Unable to extract DH algorithm identifier from private key data.");
-
-            return id;
-        }
-
-        private byte[] ExtractMac()
-        {
-            var data = (Asn1Utils.Goto(obj, "0/1/1") as Asn1OctetString)?.GetOctets();
-
-            if (data == null)
-                throw new CryptographicException("Unable to extract MAC from private key data.");
-
-            if (data.Length != MacSize)
-                throw new CryptographicException($"Invalid MAC size: expected {MacSize}, got {data.Length}.");
-
-            return data;
-        }
-
-        private byte[] ExtractCek()
-        {
-            var data = (Asn1Utils.Goto(obj, "0/1/0") as Asn1OctetString)?.GetOctets();
-
-            if (data == null)
-                throw new CryptographicException("Unable to extract CEK from private key data.");
-
-            if (data.Length != CekSize)
-                throw new CryptographicException($"Invalid CEK size: expected {CekSize}, got {data.Length}.");
-
-            return data;
-        }
-
-        private byte[] ExtractUkm()
-        {
-            var data = (Asn1Utils.Goto(obj, "0/0") as Asn1OctetString)?.GetOctets();
-
-            if (data == null)
-                throw new CryptographicException("Unable to extract UKM from private key data.");
-
-            if (data.Length != UkmSize)
-                throw new CryptographicException($"Invalid UKM size: expected {UkmSize}, got {data.Length}.");
-
-            return data;
-        }
-
-        protected abstract int UkmSize { get; }
-        protected abstract int CekSize { get; }
-        protected abstract int MacSize { get; }
 
         protected abstract byte[] Gost28147_SBox { get; }
 
-        public byte[] UKM => _ukm.Value;
-        public byte[] CEK => _cek.Value;
-        public byte[] MAC => _mac.Value;
-
-        public DerObjectIdentifier ParamSetId => _paramSetId.Value;
-        public DerObjectIdentifier DigestAlgorithmId => _digestAlgId.Value;
-        public DerObjectIdentifier DHAlgorithmId => _dhAlgId.Value;
+        public byte[] UKM { get; }
+        public byte[] CEK { get; }
+        public byte[] MAC { get; }
+        public KeyParameters KeyParameters { get; }
 
         // https://tools.ietf.org/html/rfc4357#section-6.4
         // https://tools.ietf.org/html/rfc7836#section-4.6
@@ -177,10 +102,6 @@ namespace ExtractPkey
             : base(data)
         {
         }
-
-        protected override int UkmSize => 8;
-        protected override int CekSize => 32;
-        protected override int MacSize => 4;
 
         protected override byte[] Gost28147_SBox => Gost28147Engine.GetSBox("E-A");
 
@@ -242,10 +163,6 @@ namespace ExtractPkey
             : base(data)
         {
         }
-
-        protected override int UkmSize => 8;
-        protected override int CekSize => 32;
-        protected override int MacSize => 4;
 
         protected override byte[] Gost28147_SBox => Gost28147_TC26ParamSetZ;
 
@@ -314,9 +231,5 @@ namespace ExtractPkey
             : base(data)
         {
         }
-
-        protected override int UkmSize => 8;
-        protected override int CekSize => 64;
-        protected override int MacSize => 4;
     }
 }

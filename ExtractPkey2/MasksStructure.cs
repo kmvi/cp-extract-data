@@ -37,7 +37,7 @@ namespace ExtractPkey
                 case Asn1Sequence seq:
                     return new MasksStructure(seq);
                 default:
-                    throw new ArgumentException("Invalid Masks structure.");
+                    throw new ArgumentException($"Неподдерживаемый тип: {obj.GetType().Name}");
             }
         }
 

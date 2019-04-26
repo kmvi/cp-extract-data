@@ -9,36 +9,8 @@ using System.Text;
 
 namespace ExtractPkey
 {
-    static class Asn1Utils
+    static class Utils
     {
-        public static Asn1Encodable Goto(Asn1Encodable obj, string path)
-        {
-            Asn1Encodable cur = obj;
-            string[] parts = path.Split('/');
-            
-            foreach (string part in parts) {
-                var seq = cur as Asn1Sequence;
-                if (seq == null && cur is Asn1TaggedObject tag) {
-                    seq = tag.GetObject() as Asn1Sequence;
-                }
-
-                int index = Int32.Parse(part);
-                if (seq != null && index >= 0 && seq.Count > index) {
-                    cur = seq[index];
-                } else {
-                    throw new Asn1Exception(String.Format(
-                        "Невозможно выполнить переход по индексу {0} в объекте {1}.", index, cur));
-                }
-            }
-
-            return cur;
-        }
-
-        public static byte[] ExtractOctets(Asn1Encodable obj)
-            => (obj is Asn1TaggedObject tagObj && tagObj.GetObject() is Asn1OctetString str)
-                    ? str.GetOctets()
-                    : new byte[0];
-
         private static readonly DerObjectIdentifier GostR3410_2001DH =
             new DerObjectIdentifier(CryptoProObjectIdentifiers.GostID + ".98");
 

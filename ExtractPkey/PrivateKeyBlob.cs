@@ -15,11 +15,11 @@ namespace ExtractPkey
         public byte[] SessionKey { get; protected set; }
 
         protected abstract NativeMethods.ALG_ID EphemAlgId { get; }
-        protected abstract uint PublicKeyLength { get; }
         protected abstract NativeMethods.ALG_ID ExportAlgId { get; }
         protected abstract NativeMethods.ALG_ID KeyAlgId { get; }
-        protected abstract int KeyOffset { get; }
+        protected abstract uint PublicKeyLength { get; }
         protected abstract uint BlobLength { get; }
+        protected abstract int KeyOffset { get; }
 
         public byte[] GetPrivateKeyBlob(IntPtr context, KeyDerivation derive)
         {
@@ -107,7 +107,6 @@ namespace ExtractPkey
                 if (!result)
                     throw new Win32Exception(Marshal.GetLastWin32Error());
 
-                // export wrapped key
                 result = NativeMethods.CryptSetKeyParam(hExportKey, (int)NativeMethods.KP_ALGID, BitConverter.GetBytes((uint)ExportAlgId), 0);
                 if (!result)
                     throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -151,37 +150,37 @@ namespace ExtractPkey
 
             var permission = BitConverter.ToUInt32(data, 0);
             if ((permission & NativeMethods.CRYPT_EXPORT) == 0)
-                throw new CryptographicException("Private key export disabled.");
+                throw new CryptographicException("Экспорт закрытого ключа не разрешен.");
         }
     }
 
     class PrivateKeyBlob_2001 : PrivateKeyBlob
     {
         protected override NativeMethods.ALG_ID EphemAlgId => NativeMethods.ALG_ID.CALG_DH_EL_EPHEM;
-        protected override uint PublicKeyLength => 512u;
         protected override NativeMethods.ALG_ID ExportAlgId => NativeMethods.ALG_ID.CALG_PRO_EXPORT;
         protected override NativeMethods.ALG_ID KeyAlgId => NativeMethods.ALG_ID.CALG_GR3410EL;
-        protected override int KeyOffset => 36;
+        protected override uint PublicKeyLength => 512u;
         protected override uint BlobLength => 100;
+        protected override int KeyOffset => 36;
     }
 
     class PrivateKeyBlob_2012_256 : PrivateKeyBlob
     {
         protected override NativeMethods.ALG_ID EphemAlgId => NativeMethods.ALG_ID.CALG_DH_GR3410_12_256_EPHEM;
-        protected override uint PublicKeyLength => 512u;
         protected override NativeMethods.ALG_ID ExportAlgId => NativeMethods.ALG_ID.CALG_PRO12_EXPORT;
         protected override NativeMethods.ALG_ID KeyAlgId => NativeMethods.ALG_ID.CALG_GR3410_12_256;
-        protected override int KeyOffset => 37;
+        protected override uint PublicKeyLength => 512u;
         protected override uint BlobLength => 104;
+        protected override int KeyOffset => 37;
     }
 
     class PrivateKeyBlob_2012_512 : PrivateKeyBlob
     {
         protected override NativeMethods.ALG_ID EphemAlgId => NativeMethods.ALG_ID.CALG_DH_GR3410_12_512_EPHEM;
-        protected override uint PublicKeyLength => 1024u;
         protected override NativeMethods.ALG_ID ExportAlgId => NativeMethods.ALG_ID.CALG_PRO12_EXPORT;
         protected override NativeMethods.ALG_ID KeyAlgId => NativeMethods.ALG_ID.CALG_GR3410_12_512;
-        protected override int KeyOffset => 39;
+        protected override uint PublicKeyLength => 1024u;
         protected override uint BlobLength => 168;
+        protected override int KeyOffset => 39;
     }
 }

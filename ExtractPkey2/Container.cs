@@ -50,13 +50,12 @@ namespace ExtractPkey
             => Header.PrivateKeyParameters.Algorithm.Algorithm;
 
         public ProviderType ProviderType
-            => Asn1Utils.GetProviderType(DHAlgorithmId);
+            => Utils.GetProviderType(DHAlgorithmId);
 
         public DerObjectIdentifier SignAlgorithmId
-            => Asn1Utils.GetSignAlgorithmId(ProviderType);
+            => Utils.GetSignAlgorithmId(ProviderType);
 
-
-        public ECPrivateKeyParameters GetPrivateKey()
+        public BigInteger GetPrivateKey()
         {
             var pinArray = Encoding.ASCII.GetBytes(_pin ?? "");
             var decodeKey = GetDecodeKey(Masks.Salt, pinArray);
@@ -65,11 +64,11 @@ namespace ExtractPkey
             var masksKey = new BigInteger(1, Masks.Key);
             var param = new ECKeyGenerationParameters(PublicKeyAlg.PublicKeyParamSet, new SecureRandom());
             var maskInv = masksKey.ModInverse(param.DomainParameters.Curve.Order);
-            var rawSecret = primKeyWithMask.Multiply(maskInv).Mod(param.DomainParameters.Curve.Order);
+            var privateKey = primKeyWithMask.Multiply(maskInv).Mod(param.DomainParameters.Curve.Order);
 
-            CheckPublicKey(param.DomainParameters, rawSecret, Header.PublicX);
+            CheckPublicKey(param.DomainParameters, privateKey, Header.PublicX);
 
-            return new ECPrivateKeyParameters("ECGOST3410", rawSecret, param.PublicKeyParamSet);
+            return privateKey;
         }
 
         private static void CheckPublicKey(ECDomainParameters domainParams, BigInteger privateKey, byte[] publicX)

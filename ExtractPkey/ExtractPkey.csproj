@@ -49,8 +49,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\ExtractPkey2\Asn1Utils.cs">
-      <Link>Asn1Utils.cs</Link>
+    <Compile Include="..\ExtractPkey2\KeyParameters.cs">
+      <Link>KeyParameters.cs</Link>
     </Compile>
     <Compile Include="EncryptedPrivateKey.cs" />
     <Compile Include="Export.cs" />

@@ -43,8 +43,7 @@ namespace ExtractPkey
                 var export = new Export(cert);
                 var pkey = export.ExportPrivateKey();
                 export.CheckPublicKey(pkey);
-                PrintPrivateKey(pkey, export.ParamSetId,
-                    export.DHAlgorithmId, export.DigestAlgorithmId);
+                PrintPrivateKey(pkey, export.KeyParameters);
             } catch (Exception e) {
                 Console.Error.WriteLine(e.Message);
             }
@@ -59,20 +58,20 @@ namespace ExtractPkey
             options.WriteOptionDescriptions(Console.Out);
         }
 
-        private static void PrintPrivateKey(BigInteger pkey,
-            DerObjectIdentifier algId, DerObjectIdentifier dhAlgId, DerObjectIdentifier digestAlgId)
+        private static void PrintPrivateKey(BigInteger pkey, KeyParameters keyParams)
         {
-            var ecpkey = new ECPrivateKeyParameters("ECGOST3410", pkey, algId);
+            var gostParams = Gost3410PublicKeyAlgParameters.GetInstance(keyParams.Algorithm.Parameters);
+
             var pkeyEnc = new DerSequence(
                 new DerInteger(0),
                 new DerSequence(
-                    dhAlgId,
+                    keyParams.Algorithm.Algorithm,
                     new DerSequence(
-                        ecpkey.PublicKeyParamSet,
-                        digestAlgId
+                        gostParams.PublicKeyParamSet,
+                        gostParams.DigestParamSet
                     )
                 ),
-                new DerOctetString(new DerInteger(ecpkey.D))
+                new DerOctetString(new DerInteger(pkey))
             );
 
             var pemObject = new PemObject("PRIVATE KEY", pkeyEnc.GetDerEncoded());
@@ -94,9 +93,11 @@ namespace ExtractPkey
 
         private static X509Certificate2 FindCertificate(string thumbprint)
         {
-            var names = new[] { StoreName.My, StoreName.Root, StoreName.TrustedPeople,
-                StoreName.TrustedPublisher, StoreName.AuthRoot };
             var locations = new[] { StoreLocation.LocalMachine, StoreLocation.CurrentUser };
+            var names = new[] {
+                StoreName.My, StoreName.Root, StoreName.TrustedPeople,
+                StoreName.TrustedPublisher, StoreName.AuthRoot
+            };
 
             foreach (var location in locations) {
                 foreach (var name in names) {
@@ -109,7 +110,7 @@ namespace ExtractPkey
                 }
             }
 
-            throw new CryptographicException("Certificate with thumbprint " + thumbprint + " not found.");
+            throw new CryptographicException($"Сертификат с отпечатком {thumbprint} не найден.");
         }
     }
 }

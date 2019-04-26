@@ -8,9 +8,9 @@ using System.Text;
 
 namespace ExtractPkey
 {
-    class PrivateKeyParameters
+    class KeyParameters
     {
-        public PrivateKeyParameters(Asn1Sequence seq)
+        public KeyParameters(Asn1Sequence seq)
         {
             Attributes = seq?.OfType<DerBitString>().FirstOrDefault();
             Algorithm = seq?.OfType<Asn1TaggedObject>()
@@ -19,27 +19,27 @@ namespace ExtractPkey
                 .FirstOrDefault();
 
             if (Algorithm == null)
-                throw new CryptographicException("Ошибка в данных header.key.");
+                throw new CryptographicException("Ошибка в данных параметров ключа.");
         }
 
         public DerBitString Attributes { get; }
         public AlgorithmIdentifier Algorithm { get; }
 
-        public static PrivateKeyParameters GetInstance(object obj)
+        public static KeyParameters GetInstance(object obj)
         {
             switch (obj) {
                 case null:
                     return null;
-                case PrivateKeyParameters pkp:
+                case KeyParameters pkp:
                     return pkp;
                 case Asn1Sequence seq:
-                    return new PrivateKeyParameters(seq);
+                    return new KeyParameters(seq);
                 default:
-                    throw new ArgumentException("Invalid PrivateKeyParameters structure.");
+                    throw new ArgumentException($"Неподдерживаемый тип: {obj.GetType().Name}");
             }
         }
 
-        public static PrivateKeyParameters GetInstance(Asn1TaggedObject obj, bool explicitly)
+        public static KeyParameters GetInstance(Asn1TaggedObject obj, bool explicitly)
             => GetInstance(Asn1TaggedObject.GetInstance(obj, explicitly));
     }
 }

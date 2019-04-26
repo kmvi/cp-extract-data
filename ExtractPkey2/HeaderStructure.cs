@@ -31,7 +31,7 @@ namespace ExtractPkey
                 }
 
                 var seq3 = seq2?.OfType<Asn1Sequence>().FirstOrDefault();
-                PrivateKeyParameters = PrivateKeyParameters.GetInstance(seq3);
+                PrivateKeyParameters = KeyParameters.GetInstance(seq3);
                 Attributes = seq2?.OfType<DerBitString>().FirstOrDefault();
             }
 
@@ -47,7 +47,7 @@ namespace ExtractPkey
         public X509CertificateStructure Certificate { get; }
         public X509CertificateStructure Certificate2 { get; }
         public DerBitString Attributes { get; }
-        public PrivateKeyParameters PrivateKeyParameters { get; }
+        public KeyParameters PrivateKeyParameters { get; }
 
         public static HeaderStructure GetInstance(object obj)
         {
@@ -59,7 +59,7 @@ namespace ExtractPkey
                 case Asn1Sequence seq:
                     return new HeaderStructure(seq);
                 default:
-                    throw new ArgumentException("Invalid Primary structure.");
+                    throw new ArgumentException($"Неподдерживаемый тип: {obj.GetType().Name}");
             }
         }
 

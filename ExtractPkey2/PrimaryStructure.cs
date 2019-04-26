@@ -38,7 +38,7 @@ namespace ExtractPkey
                 case Asn1Sequence seq:
                     return new PrimaryStructure(seq);
                 default:
-                    throw new ArgumentException("Invalid Primary structure.");
+                    throw new ArgumentException($"Неподдерживаемый тип: {obj.GetType().Name}");
             }
         }
 

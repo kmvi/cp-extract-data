@@ -41,7 +41,7 @@ namespace ExtractPkey
                         container.PublicKeyAlg.DigestParamSet
                     )
                 ),
-                new DerOctetString(new DerInteger(container.GetPrivateKey().D))
+                new DerOctetString(new DerInteger(container.GetPrivateKey()))
             );
         }
     }
@@ -80,7 +80,7 @@ namespace ExtractPkey
             string friendlyName = "alias";
             var store = new Pkcs12Store();
             store.SetCertificateEntry(friendlyName, certEntry);
-            store.SetKeyEntry(friendlyName, new AsymmetricKeyEntry(privateKey), new[] { certEntry });
+            //store.SetKeyEntry(friendlyName, new AsymmetricKeyEntry(privateKey), new[] { certEntry });
 
             var password = _password.ToCharArray();
             using (var ms = new MemoryStream()) {
